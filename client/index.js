@@ -156,6 +156,11 @@ async function fetchNFTs() {
 
         if (t.mineTime < 3600) tableColor = "table-warning";
         if (t.timeRemaining < 3600) tableColor = "table-danger";
+
+        let days = 0;
+        if (t.timeRemaining >= ONE_DAY) {
+          days = Math.floor(t.timeRemaining / ONE_DAY);
+        }
         $("#user-nfts").append(`
         <tr class="${tableColor}">
             <th scope="row">${t.tokenId}</th>
@@ -163,7 +168,8 @@ async function fetchNFTs() {
             <td>${t._score}</td>
             <td>${
               t.timeRemaining > 0
-                ? new Date(t.timeRemaining * 1000).toISOString().substr(11, 8)
+                ? `+ ${days} days ` +
+                  new Date(t.timeRemaining * 1000).toISOString().substr(11, 8)
                 : "DEAD!!"
             }</td>
             <td>${t.mineTime ? t.mineTime : "MINE NOW!"}</td>
