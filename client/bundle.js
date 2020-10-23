@@ -772,6 +772,10 @@ $("#feedBtn").click(() => {
   $("#confirmBtn").show();
 });
 
+$("#refreshBtn").click(() => {
+  refreshDashboard();
+});
+
 // NAVIGATION
 
 $("#eventsLink").click(() => {
