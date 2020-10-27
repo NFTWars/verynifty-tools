@@ -82,17 +82,59 @@
 
     <!-- Home -->
     <div class="jumbotron" id="welcome" style="display: none">
-      <h1 class="display-4">Hello, cryptonaut!</h1>
+      <h1 class="display-4">Welcome to Very-Nifty Tools!!</h1>
       <p class="lead">Handy tools for the Very Nifty dApp.</p>
       <hr class="my-4" />
-      <p>
-        View your dashboard, scan the vNFT market, leaderboard and events. Feed
-        and Claim your mining rewards for all of your NFTs in one single
-        transaction, paying a 5% fee (be aware that the first time you will need
-        to add the smart contract as care taker, for EACH of your vNFTs, which
-        can result in multiple transactions. This will only happen once for
-        every vNFT)
-      </p>
+      <div class="ml-3">
+        <b>This app lets you:</b>
+        <ul>
+          <li>View your dashboard</li>
+          <li>Scan the market to fatalize vNFTs</li>
+          <li>Check leaderboard and latest events</li>
+          <li>Feed your vNFTs or claim your mining rewards in one single</li>
+        </ul>
+
+        <b>Mining and feed features:</b>
+        <p class="text-wrap">
+          You will need to add 0x57f0B53926dd62f2E26bc40B30140AbEA474DA94 as
+          care taker for EACH of your vNFTs. The app does that for you when you
+          are going to use the feature.
+        </p>
+        <p>
+          This means that the first time you feed or mine from your vNFTs you
+          will first see the "addCareTaker" transaction that you need to approve
+          in your wallet for EACH of the tokens you are utilizing.
+        </p>
+        <p>
+          Also, you will pay a 5% fee for the total MUSE cost in the case of
+          feeding, or the total MUSE received in the case of mining.
+        </p>
+
+        <p>
+          For example, if you own 5 vNFTs and you are feeding for the first
+          time, you will need to:
+        </p>
+
+        <ol>
+          <li>Click on Feed button</li>
+          <li>
+            Select the gem to feed your vNFT in the dropdowns to the right
+          </li>
+          <li>Click on Confirm button</li>
+          <li>Approve "addCareTaker" transaction 5 times</li>
+          <li>Approve MUSE tokens to be spent by the contract</li>
+          <li>
+            If enough MUSE in your wallet, accept the final "feedMultiple"
+            transaction to execute the feed
+          </li>
+        </ol>
+
+        <p>
+          PS: The second time you feed or mine, you will one have to execute one
+          transaction ("feedMultiple" or "claimMultiple"), so its recommended to
+          do the approvals when gas cost is low
+        </p>
+      </div>
       <a class="btn btn-dark mt-3" href="#" role="button" id="startBtn"
         >Go to Dashboard</a
       >
@@ -273,7 +315,7 @@
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title font-weight-bold">Warning!</h5>
+            <h5 class="modal-title font-weight-bold">Disclaimer</h5>
             <button
               type="button"
               class="close"
@@ -299,7 +341,7 @@
             >
               Close
             </button>
-            <button type="button" class="btn btn-primary" id="acceptConditions">
+            <button type="button" class="btn btn-dark" id="acceptConditions">
               I understand and Agree
             </button>
           </div>
