@@ -92,9 +92,13 @@ async function fetchNFTs() {
     const price = await getMusePrice();
     $("#muse-balance").html(`MUSE Balance: ${fromWei(museBalance)}`);
     $("#muse-price").html(
-      `Price: 1 MUSE = ${price} ETH ($${Number(ethPrice * price).toFixed(
-        2
-      )} USD)`
+      `Price: 
+        <a 
+          href="https://app.uniswap.org/#/swap?inputCurrency=0xb6ca7399b4f9ca56fc27cbff44f4d2e4eef1fc81" 
+          rel="noopener noreferrer" 
+          target="_blank">1 MUSE = ${price} ETH 
+        </a> 
+        ($${Number(ethPrice * price).toFixed(2)} USD)`
     );
 
     for (let i = 0; i < tokens.length; i++) {
@@ -259,7 +263,11 @@ function getItemPrice(id) {
 
 async function scanMarket() {
   if (!scanned) {
-    $("#scan-nfts").html("Loading...");
+    $("#scan-nfts, #market-info").html(`
+      <div class="spinner-grow m-3" role="status">
+        <span class="sr-only">Loading...</span>
+      </div>
+    `);
 
     const currentBlock = await web3.eth.getBlockNumber();
     const currentTime = Date.now() / 1000;
@@ -295,8 +303,7 @@ async function scanMarket() {
     const soonIds = [];
     let toKill = 0;
 
-    $("#scan-nfts").empty();
-    $("#market-info").empty();
+    let empty = true;
 
     for (let i = 0; i < mintEvents.length - 1; i++) {
       const { tokenId } = mintEvents[i].returnValues;
@@ -317,6 +324,11 @@ async function scanMarket() {
                 .call();
               if (_score > 1) {
                 toKill++;
+                if (empty) {
+                  $("#scan-nfts").empty();
+                  $("#market-info").empty();
+                  empty = false;
+                }
                 $("#scan-nfts").append(`
                     <tr>
                       <th scope="row">${tokenId}</th>
@@ -364,6 +376,8 @@ async function scanMarket() {
       }
     }
 
+    if (empty) $("#scan-nfts, #market-info").empty();
+
     const museSupply = await muse.methods.totalSupply().call();
 
     $("#market-info").append(`
@@ -374,8 +388,13 @@ async function scanMarket() {
       <p>Dying soon: ${soonIds.length}</p>
       <p>Available to Kill: ${toKill}</p>
       <br/>
-      <button class="btn btn-outline-dark" onclick="refreshScanner()">REFRESH</button>
+      <button class="btn btn-outline-dark" id="refresh-scanner">REFRESH</button>
     `);
+
+    $("#refresh-scanner").click(() => {
+      console.log("Refreshing scanner...");
+      refreshScanner();
+    });
 
     soonIds
       .sort((a, b) => a.timeRemaining - b.timeRemaining)
@@ -641,7 +660,11 @@ function resetMine() {
 
 function refreshDashboard() {
   userNFTs = [];
-  $("#user-nfts").empty();
+  $("#user-nfts").html(`
+      <div class="spinner-grow m-3" role="status">
+        <span class="sr-only">Loading...</span>
+      </div>
+    `);
   $("#feedBtn, #confirmBtn, #mineBtn, #refreshBtn").hide();
 
   fetchNFTs();
@@ -829,7 +852,11 @@ $(".navbar-nav>a").click(function () {
 });
 
 $("#acceptConditions").click(() => {
-  $("#user-nfts").append("Loading...");
+  $("#user-nfts").html(`
+      <div class="spinner-grow m-3" role="status">
+        <span class="sr-only">Loading...</span>
+      </div>
+    `);
   $("#warningModal").modal("hide");
   fetchNFTs();
   $("#welcome, .page-footer").show();
