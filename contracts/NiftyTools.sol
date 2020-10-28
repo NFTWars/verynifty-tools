@@ -5,6 +5,7 @@ pragma solidity ^0.6.0;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./interfaces/IGasFeed.sol";
 
 interface IVNFT {
     function fatality(uint256 _deadId, uint256 _tokenId) external;
@@ -28,8 +29,12 @@ interface IVNFT {
 contract NiftyTools is Ownable {
     using SafeMath for uint256;
 
+    // External contracts
     IVNFT public vnft;
     IERC20 public muse;
+    IGasFeed public gasFeed = IGasFeed(0xA417221ef64b1549575C977764E651c9FAB50141);
+
+    // Contrac Variables
     uint256 public maxIds = 20;
     uint256 public fee;
     address public feeRecipient;
@@ -128,6 +133,10 @@ contract NiftyTools is Ownable {
     function setFeeRecipient(address _feeRecipient) public onlyOwner {
         require(_feeRecipient != address(0));
         feeRecipient = _feeRecipient;
+    }
+
+    function setGasFeed(IGasFeed _gasFeed) public onlyOwner {
+        gasFeed = _gasFeed;
     }
 
     function setPause(bool _paused) public onlyOwner {
