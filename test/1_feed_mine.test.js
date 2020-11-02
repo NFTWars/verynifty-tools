@@ -81,6 +81,7 @@ contract("NiftyTools", ([operator, alice, bob, charlie]) => {
     it("should be able to claim mining rewards from multiple tokens", async function () {
       const initialBalance = await muse.balanceOf(alice);
       const initialOperatorBalance = await muse.balanceOf(operator);
+
       await tools.claimMultiple(IDS, { from: alice });
       const finalBalance = await muse.balanceOf(alice);
 
@@ -99,7 +100,17 @@ contract("NiftyTools", ([operator, alice, bob, charlie]) => {
       );
     });
 
+    it("should not be able to feed multiple tokens without approving MUSE", async function () {
+      await muse.approve(tools.address, toWei(100), { from: alice });
+      await expectRevert(
+        tools.feedMultiple(IDS, Array(10).fill(1), { from: alice }),
+        "revert ERC20: transfer amount exceeds allowance"
+      );
+    });
+
     it("should be able to feed multiple tokens", async function () {
+      // One time approval
+      await tools.approveMuse(toWei(10000), { from: operator });
       await muse.approve(tools.address, toWei(100), { from: alice });
 
       const initialBalance = await muse.balanceOf(alice);

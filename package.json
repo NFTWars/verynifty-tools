@@ -8,10 +8,8 @@
   "scripts": {
     "ganache": "ganache-cli -p 8545 -i 666",
     "deploy": "truffle migrate --reset",
-    "test": "truffle test",
-    "kill": "node scripts/kill",
-    "soon": "node scripts/soon",
-    "myNFTs": "node scripts/myNFTs",
+    "test-feed": "truffle test test/1_feed_mine.test.js",
+    "test-care": "truffle test test/2_ccaretaker.test.js",
     "flat": "truffle-flattener contracts/NiftyTools.sol > flats/NiftyTools.sol",
     "build": "browserify client/index.js > client/bundle.js"
   },

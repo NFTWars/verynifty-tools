@@ -4,8 +4,9 @@ pragma solidity ^0.6.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+// import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./utils/UintSet.sol";
+import "./interfaces/IMuseToken.sol";
 import "./interfaces/IGasFeed.sol";
 import "./interfaces/IChiToken.sol";
 import "./interfaces/IVNFT.sol";
@@ -13,6 +14,9 @@ import "./interfaces/IVNFT.sol";
 contract EventsPage is Ownable {
     event StartCareTaker(address indexed user, uint256 tokenId);
     event StopCareTaker(address indexed user, uint256 tokenId);
+
+    event Mined(uint256 tokenId, uint256 amount);
+    event Fed(uint256 tokenId, uint256 itemId);
 }
 
 contract NiftyTools is EventsPage {
@@ -24,7 +28,7 @@ contract NiftyTools is EventsPage {
 
     // External contracts
     IVNFT public vnft;
-    IERC20 public muse;
+    IMuseToken public muse;
     IGasFeed public gasFeed = IGasFeed(
         0xA417221ef64b1549575C977764E651c9FAB50141
     );
@@ -45,7 +49,7 @@ contract NiftyTools is EventsPage {
 
     constructor(
         IVNFT _vnft,
-        IERC20 _muse,
+        IMuseToken _muse,
         uint256 _fee
     ) public {
         vnft = _vnft;
@@ -82,6 +86,12 @@ contract NiftyTools is EventsPage {
         }
     }
 
+    // GETTERS
+
+    function isCareTaking(uint256 id) public view returns (bool) {
+        return careTakerSet.exists(id);
+    }
+
     /**
         @notice claim MUSE tokens from multiple vNFTs
         @dev contract should be whitelisted as caretaker beforehand
@@ -89,7 +99,7 @@ contract NiftyTools is EventsPage {
     function claimMultiple(uint256[] memory ids)
         external
         notPaused
-        discountCHI
+    // discountCHI
     {
         require(ids.length <= maxIds, "LENGTH");
 
@@ -124,7 +134,7 @@ contract NiftyTools is EventsPage {
     function feedMultiple(uint256[] memory ids, uint256[] memory itemIds)
         external
         notPaused
-        discountCHI
+    // discountCHI
     {
         require(ids.length <= maxIds, "Too many ids");
         uint256 museCost = _checkAmount(itemIds);
@@ -139,8 +149,6 @@ contract NiftyTools is EventsPage {
             "MUSE:fee"
         );
 
-        require(muse.approve(address(vnft), museCost), "MUSE:approve");
-
         for (uint256 i = 0; i < ids.length; i++) {
             vnft.buyAccesory(ids[i], itemIds[i]);
         }
@@ -153,7 +161,7 @@ contract NiftyTools is EventsPage {
     function startCareTaking(uint256[] memory ids)
         external
         notPaused
-        discountCHI
+    // discountCHI
     {
         require(ids.length <= maxIds, "LENGTH");
 
@@ -174,7 +182,7 @@ contract NiftyTools is EventsPage {
     function stopCareTaking(uint256[] memory ids)
         external
         notPaused
-        discountCHI
+    // discountCHI
     {
         require(ids.length <= maxIds, "LENGTH");
 
@@ -190,25 +198,57 @@ contract NiftyTools is EventsPage {
     }
 
     /**
-        @dev trigger feed of care taken vNFTs
+        @dev trigger GEM feed of care taken vNFTs
      */
-    function triggerFeed() external onlyOwner discountCHI {
+    function triggerFeed(uint256 itemId)
+        external
+        onlyOwner /*discountCHI*/
+    {
+        uint256 i;
+        uint256 limit = careTakerSet.count().sub(nextIndex) > maxIds
+            ? maxIds
+            : careTakerSet.count().sub(nextIndex);
+
+        uint256 itemCost = vnft.itemPrice(itemId);
+
+        for (i = nextIndex; i < limit; i++) {
+            uint256 _id = careTakerSet.keyAtIndex(i);
+
+            uint256 userBalance = museBalance[vnft.ownerOf(_id)];
+
+            if (userBalance >= itemCost) {
+                // Add balance to user mapping
+                museBalance[vnft.ownerOf(_id)] = museBalance[vnft.ownerOf(_id)]
+                    .sub(itemCost);
+
+                vnft.buyAccesory(_id, itemId);
+
+                emit Fed(_id, itemId);
+            }
+        }
+
+        nextIndex = i == limit ? 0 : i;
+    }
+
+    /**
+        @dev trigger MUSE mining of care taken vNFTs
+     */
+    function triggerMine()
+        external
+        onlyOwner /*discountCHI*/
+    {
         uint256 totalFee = 0;
         uint256 i;
-        for (
-            i = nextIndex;
-            i <
-            (
-                careTakerSet.count().sub(nextIndex) > maxIds
-                    ? maxIds
-                    : careTakerSet.count().sub(nextIndex)
-            );
-            i++
-        ) {
+        uint256 limit = careTakerSet.count().sub(nextIndex) > maxIds
+            ? maxIds
+            : careTakerSet.count().sub(nextIndex);
+
+        for (i = nextIndex; i < limit; i++) {
             uint256 _id = careTakerSet.keyAtIndex(i);
 
             uint256 initialBalance = muse.balanceOf(address(this));
             vnft.claimMiningRewards(_id);
+
             uint256 halfAmtMined = muse
                 .balanceOf(address(this))
                 .sub(initialBalance)
@@ -220,16 +260,28 @@ contract NiftyTools is EventsPage {
             museBalance[vnft.ownerOf(_id)] = museBalance[vnft.ownerOf(_id)].add(
                 halfAmtMined
             );
+
+            emit Mined(_id, halfAmtMined.mul(2));
         }
 
-        nextIndex = i + 1;
+        nextIndex = i == limit ? 0 : i;
 
         // Collect 50% of mined MUSE
         require(muse.transfer(feeRecipient, totalFee));
     }
 
     /**
-        @notice claim mined muse by user
+        @notice user deposits muse 
+        @dev needed to have muse available to feed when needed
+     */
+    function depositMuse(uint256 amt) external {
+        // Transfer muse from user
+        require(muse.transferFrom(msg.sender, address(this), amt));
+        museBalance[msg.sender] = museBalance[msg.sender].add(amt);
+    }
+
+    /**
+        @notice user withdraws muse from balance
      */
     function withdrawMuse() external {
         uint256 toWithdraw = museBalance[msg.sender];
@@ -242,6 +294,18 @@ contract NiftyTools is EventsPage {
     }
 
     // OWNER FUNCTIONS
+
+    function approveMuse(uint256 amount) external onlyOwner {
+        require(muse.approve(address(vnft), amount), "MUSE:approve");
+    }
+
+    function removeAllowance() external onlyOwner {
+        uint256 allowance = muse.allowance(address(this), address(vnft));
+        require(
+            muse.decreaseAllowance(address(vnft), allowance),
+            "MUSE:Allowance"
+        );
+    }
 
     function setVNFT(IVNFT _vnft) public onlyOwner {
         vnft = _vnft;

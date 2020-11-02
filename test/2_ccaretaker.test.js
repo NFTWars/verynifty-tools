@@ -1,111 +1,120 @@
-const CCareTaker = artifacts.require("CCareTaker");
+const NiftyTools = artifacts.require("NiftyTools");
 const MuseToken = artifacts.require("MuseToken");
 const VNFT = artifacts.require("VNFT");
 
-const { expectRevert } = require("@openzeppelin/test-helpers");
+const { BN, expectRevert, expectEvent } = require("@openzeppelin/test-helpers");
 
 require("./utils");
 
 const toWei = (amount) => web3.utils.toWei(String(amount));
 const fromWei = (amount) => Number(web3.utils.fromWei(String(amount)));
 
-contract("CCareTaker", ([operator, alice, bob, charlie]) => {
-  let ccareTaker, muse, vNFT;
+const MUSE_FEE = 5000; //  5% MUSE per service
+
+contract("NiftyTools", ([owner, alice, bob, feeRecipient]) => {
+  let niftyTools, muse, vNFT;
+
+  let IDS = [];
 
   before(async function () {
     muse = await MuseToken.new();
     vNFT = await VNFT.new(muse.address);
-    ccareTaker = await CCareTaker.new(vNFT.address, muse.address);
+    niftyTools = await NiftyTools.new(vNFT.address, muse.address, MUSE_FEE);
 
     await muse.grantRole(
       "0x9f2df0fed2c77648de5860a4cc508cd0818c85b8b8a1ab4ceeef8d981c8956a6",
       vNFT.address
     );
+
+    await niftyTools.setFeeRecipient(feeRecipient);
+
+    await niftyTools.approveMuse(toWei(100000), { from: owner });
+
+    // fund address with MUSE
+    await muse.transfer(alice, toWei(100), { from: owner });
+
+    // Mint 10 vNFTs
+    for (let i = 0; i < 10; i++) {
+      await vNFT.mint(alice, { from: owner });
+      await vNFT.addCareTaker(i, niftyTools.address, { from: alice });
+      IDS.push(i);
+    }
+
+    await vNFT.createItem("simple", 5, 100, 3 * 24 * 60 * 60);
   });
 
-  describe("Initial Values", () => {
-    it("should get correct contract addresses", async function () {
-      const _vnft = await ccareTaker.vnftContract();
-      assert.equal(_vnft, vNFT.address);
+  describe("Care Taker Mining", () => {
+    it("should be able to start care taking", async function () {
+      await niftyTools.startCareTaking(IDS, { from: alice });
 
-      const _muse = await ccareTaker.museToken();
-      assert.equal(_muse, muse.address);
+      for (let i = 0; i < IDS.length; i++) {
+        const isCareTaking = await niftyTools.isCareTaking(IDS[i], {
+          from: alice,
+        });
+        assert(isCareTaking);
+      }
+    });
+
+    it("should be able to trigger care taking mining", async function () {
+      await advanceTimeAndBlock(25 * 60 * 60); // 25h later
+      const tx = await niftyTools.triggerMine({ from: owner });
+      console.log("\tGas Used:", tx.receipt.gasUsed);
+
+      // 10 IDS = 884477 gas
+    });
+
+    it("feeRecipient should receive 50% of MUSE mined", async function () {
+      const balance = await muse.balanceOf(feeRecipient);
+      assert.equal(fromWei(balance), 30);
+    });
+
+    it("tools address should have 50% of MUSE mined", async function () {
+      const toolsBalance = await muse.balanceOf(niftyTools.address);
+      assert.equal(fromWei(toolsBalance), 30);
+    });
+
+    it("user address be able to withdraw 50% of mined muse", async function () {
+      const available = await niftyTools.museBalance(alice);
+      assert.equal(fromWei(available), 30);
+
+      await niftyTools.withdrawMuse({ from: alice });
+
+      const toolsBalance = await muse.balanceOf(niftyTools.address);
+      assert.equal(fromWei(toolsBalance), 0);
     });
   });
 
-  describe("CCareTaker", () => {
-    let IDS = [];
+  describe("Care Taker Mining", () => {
+    it("should be able to deposit MUSE for care taking", async function () {
+      await expectRevert(
+        niftyTools.depositMuse(toWei(10), { from: alice }),
+        "revert ERC20: transfer amount exceeds allowance "
+      );
 
-    before(async function () {
-      // fund address with MUSE
-      await muse.transfer(alice, toWei(100), { from: operator });
+      await muse.approve(niftyTools.address, toWei(100), { from: alice });
+      await niftyTools.depositMuse(toWei(50), { from: alice });
 
-      // Mint 10 vNFTs
-      for (let i = 0; i < 10; i++) {
-        await vNFT.mint(alice, { from: operator });
-        // await vNFT.addCareTaker(i, tools.address, { from: alice });
-        IDS.push(i);
-      }
+      const balance = await niftyTools.museBalance(alice);
 
-      await vNFT.createItem("simple", 5, 100, 3 * 24 * 60 * 60);
+      assert.equal(fromWei(balance), 50);
     });
 
-    it("should have muse and vnft tokens", async function () {
-      const balance = await muse.balanceOf(alice);
-      assert.equal(balance, toWei(100));
+    it("should be able to trigger care taking feeding", async function () {
+      // User needs to have enough MUSE balance on the contract to be able to feed it correctly
+      const { receipt } = await niftyTools.triggerFeed(1, { from: owner });
 
-      const owner = await vNFT.ownerOf(0);
-      assert.equal(owner, alice);
-    });
+      console.log("\tGas Used:", receipt.gasUsed);
 
-    it("should be able to deposit single vnft", async function() {
+      for (let i = 0; i < IDS.length; i++) {
+        const id = IDS[i];
 
-      let vnftToDeposit = [];
-      vnftToDeposit.push(0);
-
-      const owner = await vNFT.ownerOf(0);
-      assert.equal(owner, alice);
-      await vNFT.approve(ccareTaker.address, 0, { from: alice });
-
-      await ccareTaker.depositVnft(vnftToDeposit, {from: alice });
-
-      const newOwner = await vNFT.ownerOf(0);
-      const vnftToAddressOwner = await ccareTaker.vnftToAddress(0);
-      const playerCount = await ccareTaker.playerVnftCount(alice);
-      const vnftDeposited = await ccareTaker.vnftIsDepositedInContract(0);
-      assert.equal(newOwner, ccareTaker.address);
-      assert.equal(vnftToAddressOwner, alice);
-      assert.equal(playerCount, 1);
-      assert(vnftDeposited);
-    });
-
-    it("should be able to deposit multiple vnfts at once", async function() {
-
-      let vnftsToDeposit = [];
-      
-      vnftsToDeposit.push(1);
-      vnftsToDeposit.push(2);
-      for (let i=1; i<3; i++) {
-        const owner = await vNFT.ownerOf(i);
-        assert.equal(owner, alice);
-        await vNFT.approve(ccareTaker.address, i, { from: alice });
+        expectEvent(receipt, "Fed", {
+          tokenId: new BN(id),
+          itemId: new BN(1),
+        });
       }
 
-      const oldPlayerVnftCount = parseInt(await ccareTaker.playerVnftCount(alice));
-
-      //Deposit all the VNFTs at once 
-      await ccareTaker.depositVnft(vnftsToDeposit, {from: alice });
-
-      for (let i=1; i<3; i++) {
-        const newOwner = await vNFT.ownerOf(i);
-        const vnftToAddressOwner = await ccareTaker.vnftToAddress(i);
-        const newPlayerVnftCount = parseInt(await ccareTaker.playerVnftCount(alice));
-        const vnftDeposited = await ccareTaker.vnftIsDepositedInContract(i);
-        assert.equal(newOwner, ccareTaker.address);
-        assert.equal(vnftToAddressOwner, alice);
-        assert.equal(oldPlayerVnftCount+2, newPlayerVnftCount);
-        assert(vnftDeposited);
-      }
+      // 10 IDS = 988277 gas
     });
   });
 });
