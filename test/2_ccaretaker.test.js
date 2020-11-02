@@ -1,6 +1,7 @@
 const NiftyTools = artifacts.require("NiftyTools");
 const MuseToken = artifacts.require("MuseToken");
 const VNFT = artifacts.require("VNFT");
+const ChiToken = artifacts.require("ChiToken");
 
 const { BN, expectRevert, expectEvent } = require("@openzeppelin/test-helpers");
 
@@ -17,9 +18,15 @@ contract("NiftyTools", ([owner, alice, bob, feeRecipient]) => {
   let IDS = [];
 
   before(async function () {
+    chi = await ChiToken.new();
     muse = await MuseToken.new();
     vNFT = await VNFT.new(muse.address);
-    niftyTools = await NiftyTools.new(vNFT.address, muse.address, MUSE_FEE);
+    niftyTools = await NiftyTools.new(
+      vNFT.address,
+      muse.address,
+      chi.address,
+      MUSE_FEE
+    );
 
     await muse.grantRole(
       "0x9f2df0fed2c77648de5860a4cc508cd0818c85b8b8a1ab4ceeef8d981c8956a6",
@@ -31,7 +38,7 @@ contract("NiftyTools", ([owner, alice, bob, feeRecipient]) => {
     await niftyTools.approveMuse(toWei(100000), { from: owner });
 
     // fund address with MUSE
-    await muse.transfer(alice, toWei(100), { from: owner });
+    await muse.transfer(alice, toWei(200), { from: owner });
 
     // Mint 10 vNFTs
     for (let i = 0; i < 10; i++) {
@@ -84,7 +91,7 @@ contract("NiftyTools", ([owner, alice, bob, feeRecipient]) => {
     });
   });
 
-  describe("Care Taker Mining", () => {
+  describe("Care Taker Feeding", () => {
     it("should be able to deposit MUSE for care taking", async function () {
       await expectRevert(
         niftyTools.depositMuse(toWei(10), { from: alice }),
@@ -113,6 +120,35 @@ contract("NiftyTools", ([owner, alice, bob, feeRecipient]) => {
           itemId: new BN(1),
         });
       }
+
+      // 10 IDS = 988277 gas
+    });
+
+    it("should be able to trigger care taking feeding with CHI tokens", async function () {
+      await muse.approve(niftyTools.address, toWei(100), { from: alice });
+      await niftyTools.depositMuse(toWei(100), { from: alice });
+
+      // await chi.mint(150, { from: owner });
+      // await chi.approve(niftyTools.address, 150, { from: owner });
+
+      // let chiBalance = await chi.balanceOf(owner);
+      // console.log(String(chiBalance));
+
+      const { receipt } = await niftyTools.triggerFeed(1, { from: owner });
+
+      console.log("\tGas Used:", receipt.gasUsed);
+
+      for (let i = 0; i < IDS.length; i++) {
+        const id = IDS[i];
+
+        expectEvent(receipt, "Fed", {
+          tokenId: new BN(id),
+          itemId: new BN(1),
+        });
+      }
+
+      // chiBalance = await chi.balanceOf(owner);
+      // console.log(String(chiBalance));
 
       // 10 IDS = 988277 gas
     });

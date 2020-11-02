@@ -32,9 +32,10 @@ contract NiftyTools is EventsPage {
     IGasFeed public gasFeed = IGasFeed(
         0xA417221ef64b1549575C977764E651c9FAB50141
     );
-    IChiToken public chi = IChiToken(
-        0x0000000000004946c0e9F43F4Dee607b0eF1fA1c
-    );
+    // IChiToken public chi = IChiToken(
+    //     0x0000000000004946c0e9F43F4Dee607b0eF1fA1c
+    // );
+    IChiToken public chi;
 
     // Contrac Variables
     uint256 public maxIds = 20;
@@ -50,10 +51,12 @@ contract NiftyTools is EventsPage {
     constructor(
         IVNFT _vnft,
         IMuseToken _muse,
+        IChiToken _chi,
         uint256 _fee
     ) public {
         vnft = _vnft;
         muse = _muse;
+        chi = _chi;
         fee = _fee;
         feeRecipient = msg.sender;
     }
@@ -200,9 +203,7 @@ contract NiftyTools is EventsPage {
     /**
         @dev trigger GEM feed of care taken vNFTs
      */
-    function triggerFeed(uint256 itemId)
-        external
-        onlyOwner /*discountCHI*/
+    function triggerFeed(uint256 itemId) external onlyOwner /*discountCHI*/
     {
         uint256 i;
         uint256 limit = careTakerSet.count().sub(nextIndex) > maxIds

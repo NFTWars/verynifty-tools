@@ -1,6 +1,7 @@
 const NiftyTools = artifacts.require("NiftyTools");
 const MuseToken = artifacts.require("MuseToken");
 const VNFT = artifacts.require("VNFT");
+const ChiToken = artifacts.require("ChiToken");
 
 const { expectRevert } = require("@openzeppelin/test-helpers");
 
@@ -14,9 +15,15 @@ contract("NiftyTools", ([operator, alice, bob, charlie]) => {
   let tools, muse, vNFT;
 
   before(async function () {
+    chi = await ChiToken.new();
     muse = await MuseToken.new();
     vNFT = await VNFT.new(muse.address);
-    tools = await NiftyTools.new(vNFT.address, muse.address, MUSE_FEE);
+    tools = await NiftyTools.new(
+      vNFT.address,
+      muse.address,
+      chi.address,
+      MUSE_FEE
+    );
 
     await muse.grantRole(
       "0x9f2df0fed2c77648de5860a4cc508cd0818c85b8b8a1ab4ceeef8d981c8956a6",
